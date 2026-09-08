@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation | QA Shop</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Navbar -->
+    <header class="navbar">
+        <div class="container navbar-content">
+
+            <a href="index.html" class="brand checkout-brand">
+                <span class="brand-icon">🛍️</span>
+
+                <div>
+                    <h1>QA Shop</h1>
+                    <span>Quality E-Commerce Lab</span>
+                </div>
+            </a>
+
+            <div class="checkout-indicator">
+                Order Confirmation
+            </div>
+
+        </div>
+    </header>
+
+
+    <!-- Confirmation -->
+    <main class="container confirmation-container">
+
+        <section id="order-confirmation" class="confirmation-card">
+
+            <div class="success-icon">
+                ✓
+            </div>
+
+            <span class="section-label">
+                ORDER SUCCESSFUL
+            </span>
+
+            <h2>Order Confirmed!</h2>
+
+            <p id="success-message" class="confirmation-description">
+                Your order has been successfully placed.
+            </p>
+
+
+            <!-- Order Information -->
+            <div class="confirmation-details">
+
+                <div class="confirmation-row">
+                    <span>Order ID</span>
+                    <strong id="order-id"></strong>
+                </div>
+
+                <div class="confirmation-row">
+                    <span>Customer</span>
+                    <strong id="customer-name"></strong>
+                </div>
+
+                <div class="confirmation-row">
+                    <span>Product</span>
+                    <strong id="product-name"></strong>
+                </div>
+
+                <div class="confirmation-row">
+                    <span>Quantity</span>
+                    <strong id="quantity"></strong>
+                </div>
+
+                <div class="confirmation-row">
+                    <span>Total</span>
+                    <strong id="order-total"></strong>
+                </div>
+
+                <div class="confirmation-row payment-row">
+                    <span>Payment Status</span>
+                    <strong id="payment-status"></strong>
+                </div>
+
+            </div>
+
+
+            <a href="index.html" class="confirmation-button">
+                ← Back to Shop
+            </a>
+
+        </section>
+
+    </main>
+
+
+    <!-- Footer -->
+    <footer>
+
+        <div class="container footer-content">
+
+            <div>
+                <strong>QA Shop</strong>
+                <p>Dummy E-Commerce Testing Application</p>
+            </div>
+
+            <span>
+                Built for QA Practice
+            </span>
+
+        </div>
+
+    </footer>
+
+
+    <script src="confirmation.js"></script>
+
+</body>
+
+</html>

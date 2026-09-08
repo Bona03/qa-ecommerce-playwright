@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Checkout | QA Shop</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+
+<body>
+
+    <!-- =========================
+         NAVBAR
+    ========================== -->
+
+    <header class="navbar">
+
+        <div class="container navbar-content">
+
+            <a href="index.html" class="brand checkout-brand">
+
+                <span class="brand-icon">
+                    🛍️
+                </span>
+
+                <div>
+
+                    <h1>QA Shop</h1>
+
+                    <span>
+                        Quality E-Commerce Lab
+                    </span>
+
+                </div>
+
+            </a>
+
+
+            <div class="checkout-indicator">
+                Checkout
+            </div>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- =========================
+         CHECKOUT HERO
+    ========================== -->
+
+    <section class="checkout-hero">
+
+        <div class="container">
+
+            <a href="index.html" class="back-link">
+                ← Back to Shop
+            </a>
+
+
+            <span class="section-label">
+                CHECKOUT
+            </span>
+
+
+            <h2>
+                Complete Your Order
+            </h2>
+
+
+            <p>
+                Enter your information and choose your payment method.
+            </p>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =========================
+         CHECKOUT CONTENT
+    ========================== -->
+
+    <main class="container checkout-container">
+
+        <div class="checkout-grid">
+
+
+            <!-- =========================
+                 LEFT COLUMN
+            ========================== -->
+
+            <div class="checkout-left">
+
+
+                <!-- CUSTOMER -->
+
+                <section id="customer-information" class="checkout-card">
+
+                    <div class="card-heading">
+
+                        <span class="step-number">
+                            1
+                        </span>
+
+
+                        <div>
+
+                            <h2>
+                                Customer Information
+                            </h2>
+
+                            <p>
+                                Tell us how we can contact you.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="form-group">
+
+                        <label for="full-name">
+                            Full Name
+                        </label>
+
+                        <input type="text" id="full-name" placeholder="Enter your full name">
+
+                    </div>
+
+
+
+                    <div class="form-group">
+
+                        <label for="email">
+                            Email
+                        </label>
+
+                        <input type="email" id="email" placeholder="example@email.com">
+
+                    </div>
+
+
+
+                    <div class="form-group">
+
+                        <label for="phone">
+                            Phone Number
+                        </label>
+
+                        <input type="text" id="phone" placeholder="08xxxxxxxxxx">
+
+                    </div>
+
+                </section>
+
+
+
+                <!-- SHIPPING -->
+
+                <section id="shipping-information" class="checkout-card">
+
+                    <div class="card-heading">
+
+                        <span class="step-number">
+                            2
+                        </span>
+
+
+                        <div>
+
+                            <h2>
+                                Shipping Information
+                            </h2>
+
+                            <p>
+                                Where should we deliver your order?
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="form-group">
+
+                        <label for="address">
+                            Address
+                        </label>
+
+                        <input type="text" id="address" placeholder="Enter your complete address">
+
+                    </div>
+
+
+
+                    <div class="form-row">
+
+                        <div class="form-group">
+
+                            <label for="city">
+                                City
+                            </label>
+
+                            <input type="text" id="city" placeholder="City">
+
+                        </div>
+
+
+                        <div class="form-group">
+
+                            <label for="postal-code">
+                                Postal Code
+                            </label>
+
+                            <input type="text" id="postal-code" placeholder="Postal code">
+
+                        </div>
+
+                    </div>
+
+                </section>
+
+            </div>
+
+
+
+            <!-- =========================
+                 RIGHT COLUMN
+            ========================== -->
+
+            <div class="checkout-right">
+
+
+                <!-- ORDER SUMMARY -->
+
+                <section id="order-summary" class="checkout-card summary-card">
+
+
+                    <div class="card-heading">
+
+                        <span class="step-number">
+                            3
+                        </span>
+
+
+                        <div>
+
+                            <h2>
+                                Order Summary
+                            </h2>
+
+                            <p>
+                                Your selected product.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- PRODUCT -->
+
+                    <div class="summary-product">
+
+                        <div class="summary-product-icon">
+                            🎧
+                        </div>
+
+
+                        <div>
+
+                            <h3 id="summary-product-name">
+                                Loading product...
+                            </h3>
+
+
+                            <p>
+                                Quantity:
+                                <span id="summary-quantity">
+                                    -
+                                </span>
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- PRICE -->
+
+                    <div class="summary-details">
+
+                        <div>
+
+                            <span>
+                                Subtotal
+                            </span>
+
+                            <strong id="summary-subtotal">
+                                -
+                            </strong>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                Shipping
+                            </span>
+
+                            <strong id="summary-shipping">
+                                Rp 20.000
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <!-- TOTAL -->
+
+                    <div class="summary-total">
+
+                        <span>
+                            Total
+                        </span>
+
+                        <strong id="summary-total">
+                            -
+                        </strong>
+
+                    </div>
+
+                </section>
+
+
+
+                <!-- =========================
+                     PAYMENT
+                ========================== -->
+
+                <section id="payment" class="checkout-card">
+
+
+                    <div class="card-heading">
+
+                        <span class="step-number">
+                            4
+                        </span>
+
+
+                        <div>
+
+                            <h2>
+                                Payment Method
+                            </h2>
+
+                            <p>
+                                Select a test payment scenario.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+
+                    <div class="payment-options">
+
+
+                        <!-- VALID -->
+
+                        <label class="payment-option">
+
+                            <input
+                                type="radio"
+                                name="payment-method"
+                                value="TEST_PAYMENT_VALID">
+
+                            <span class="payment-radio"></span>
+
+
+                            <span class="payment-text">
+
+                                <strong>
+                                    Test Payment - Valid
+                                </strong>
+
+                                <small>
+                                    Payment will be approved.
+                                </small>
+
+                            </span>
+
+                        </label>
+
+
+
+                        <!-- DECLINED -->
+
+                        <label class="payment-option">
+
+                            <input
+                                type="radio"
+                                name="payment-method"
+                                value="TEST_PAYMENT_DECLINED">
+
+                            <span class="payment-radio"></span>
+
+
+                            <span class="payment-text">
+
+                                <strong>
+                                    Test Payment - Declined
+                                </strong>
+
+                                <small>
+                                    Payment will be declined.
+                                </small>
+
+                            </span>
+
+                        </label>
+
+
+
+                        <!-- CANCELLED -->
+
+                        <label class="payment-option">
+
+                            <input
+                                type="radio"
+                                name="payment-method"
+                                value="TEST_PAYMENT_CANCELLED">
+
+                            <span class="payment-radio"></span>
+
+
+                            <span class="payment-text">
+
+                                <strong>
+                                    Test Payment - Cancelled
+                                </strong>
+
+                                <small>
+                                    Payment will be cancelled.
+                                </small>
+
+                            </span>
+
+                        </label>
+
+                    </div>
+
+
+
+                    <button type="button" id="place-order" class="place-order-button">
+
+                        Place Order →
+
+                    </button>
+
+
+                    <p id="payment-message"></p>
+
+                </section>
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+
+    <!-- =========================
+         FOOTER
+    ========================== -->
+
+    <footer>
+
+        <div class="container footer-content">
+
+            <div>
+
+                <strong>
+                    QA Shop
+                </strong>
+
+                <p>
+                    Dummy E-Commerce Testing Application
+                </p>
+
+            </div>
+
+
+            <span>
+                Built for QA Practice
+            </span>
+
+        </div>
+
+    </footer>
+
+
+
+    <script src="checkout.js"></script>
+
+</body>
+
+</html>
