@@ -1,5 +1,7 @@
+require("dotenv").config();
 const express = require("express");
-const Database = require("better-sqlite3");
+//const Database = require("better-sqlite3");
+const { Pool } = require("pg");
 
 const app = express();
 
@@ -20,19 +22,25 @@ app.use((req, res, next) => {
     next();
 });
 
-const db = new Database("database/ecommerce.db");
-
+/*const db = new Database("database/ecommerce.db");
 db.pragma("foreign_keys = ON");
+*/
+
+const db = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
 
 
 // =====================================================
 // GET PRODUCTS
 // =====================================================
 
-app.get("/api/products", (req, res) => {
-    const products = db
-        .prepare("SELECT * FROM products")
-        .all();
+app.get("/api/products", async (req, res) => {
+    const result = await db.query("SELECT * FROM products");
+    const products = result.rows;
 
     res.json(products);
 });
@@ -42,15 +50,15 @@ app.get("/api/products", (req, res) => {
 // GET PRODUCT BY ID
 // =====================================================
 
-app.get("/api/products/:id", (req, res) => {
+app.get("/api/products/:id", async (req, res) => {
 
-    const product = db
-        .prepare(`
-            SELECT *
-            FROM products
-            WHERE product_id = ?
-        `)
-        .get(req.params.id);
+     const result = await db.query(`
+        SELECT *
+        FROM products
+        WHERE product_id = $1
+    `, [req.params.id]);
+
+    const product = result.rows[0];
 
     if (!product) {
         return res.status(404).json({
@@ -66,7 +74,7 @@ app.get("/api/products/:id", (req, res) => {
 // CREATE ORDER
 // =====================================================
 
-app.post("/api/orders", (req, res) => {
+app.post("/api/orders", async (req, res) => {
 
     console.log("POST /api/orders");
     console.log("Request body:", req.body);
@@ -142,38 +150,24 @@ app.post("/api/orders", (req, res) => {
     // FIND OR CREATE CUSTOMER
     // =================================================
 
-    let customer = db
-        .prepare(`
-            SELECT *
-            FROM customers
-            WHERE email = ?
-        `)
-        .get(customer_email);
+   let customerResult = await db.query(`
+    SELECT *
+    FROM customers
+    WHERE email = $1
+`, [customer_email]);
+
+let customer = customerResult.rows[0];
 
 
     if (!customer) {
+        const customerResult = await db.query(`
+            INSERT INTO customers
+            (name, email)
+            VALUES ($1, $2)
+            RETURNING *
+            `, [customer_name, customer_email]);
 
-        const customerResult = db
-            .prepare(`
-                INSERT INTO customers
-                (name, email)
-                VALUES (?, ?)
-            `)
-            .run(
-                customer_name,
-                customer_email
-            );
-
-
-        customer = db
-            .prepare(`
-                SELECT *
-                FROM customers
-                WHERE customer_id = ?
-            `)
-            .get(
-                customerResult.lastInsertRowid
-            );
+            customer = customerResult.rows[0];
 
     }
 
@@ -187,13 +181,13 @@ app.post("/api/orders", (req, res) => {
 
     for (const item of items) {
 
-        const product = db
-            .prepare(`
-                SELECT *
-                FROM products
-                WHERE product_id = ?
-            `)
-            .get(item.product_id);
+     const productResult = await db.query(`
+        SELECT *
+        FROM products
+        WHERE product_id = $1
+        `, [item.product_id]);
+
+        const product = productResult.rows[0];
 
 
         if (!product) {
@@ -261,40 +255,42 @@ app.post("/api/orders", (req, res) => {
     // =================================================
     // DATABASE TRANSACTION
     // =================================================
+const createOrder = async () => {
 
-    const createOrder = db.transaction(() => {
+    const client = await db.connect();
+
+    try {
+        await client.query("BEGIN");
 
         // ---------------------------------------------
         // CREATE ORDER
         // ---------------------------------------------
 
-        const orderResult = db
-            .prepare(`
-                INSERT INTO orders
-                (
-                    customer_id,
-                    total_amount,
-                    status
-                )
-                VALUES (?, ?, ?)
-            `)
-            .run(
-                customer.customer_id,
-                total,
-                "PENDING"
-            );
+        const orderResult = await client.query(`
+            INSERT INTO orders
+            (
+                customer_id,
+                total_amount,
+                status
+            )
+            VALUES ($1, $2, $3)
+            RETURNING order_id
+        `, [
+            customer.customer_id,
+            total,
+            "PENDING"
+        ]);
 
-
-        const orderId =
-            orderResult.lastInsertRowid;
+        const orderId = orderResult.rows[0].order_id;
 
 
         // ---------------------------------------------
         // CREATE ORDER ITEMS
         // ---------------------------------------------
 
-        const insertOrderItem =
-            db.prepare(`
+        for (const item of products) {
+
+            await client.query(`
                 INSERT INTO order_items
                 (
                     order_id,
@@ -302,36 +298,27 @@ app.post("/api/orders", (req, res) => {
                     quantity,
                     price
                 )
-                VALUES (?, ?, ?, ?)
-            `);
-
-
-        // ---------------------------------------------
-        // UPDATE STOCK
-        // ---------------------------------------------
-
-        const updateStock =
-            db.prepare(`
-                UPDATE products
-                SET stock = stock - ?
-                WHERE product_id = ?
-            `);
-
-
-        for (const item of products) {
-
-            insertOrderItem.run(
+                VALUES ($1, $2, $3, $4)
+            `, [
                 orderId,
                 item.product.product_id,
                 item.quantity,
                 item.product.price
-            );
+            ]);
 
 
-            updateStock.run(
+            // ---------------------------------------------
+            // UPDATE STOCK
+            // ---------------------------------------------
+
+            await client.query(`
+                UPDATE products
+                SET stock = stock - $1
+                WHERE product_id = $2
+            `, [
                 item.quantity,
                 item.product.product_id
-            );
+            ]);
 
         }
 
@@ -340,7 +327,7 @@ app.post("/api/orders", (req, res) => {
         // CREATE PAYMENT
         // ---------------------------------------------
 
-        db.prepare(`
+        await client.query(`
             INSERT INTO payments
             (
                 order_id,
@@ -348,24 +335,32 @@ app.post("/api/orders", (req, res) => {
                 payment_status,
                 amount
             )
-            VALUES (?, ?, ?, ?)
-        `)
-            .run(
-                orderId,
-                payment_method,
-                "PAID",
-                total
-            );
+            VALUES ($1, $2, $3, $4)
+        `, [
+            orderId,
+            payment_method,
+            "PAID",
+            total
+        ]);
 
+        await client.query("COMMIT");
 
         return orderId;
 
-    });
+    } catch (error) {
+
+        await client.query("ROLLBACK");
+        throw error;
+
+    } finally {
+
+        client.release();
+
+    }
+};
 
 
-    const orderId =
-        createOrder();
-
+const orderId = await createOrder();
 
     // =================================================
     // RESPONSE ITEMS
@@ -427,25 +422,24 @@ app.post("/api/orders", (req, res) => {
 // GET ORDER DETAIL
 // =====================================================
 
-app.get("/api/orders/:id", (req, res) => {
+app.get("/api/orders/:id", async (req, res) => {
 
-    const order = db
-        .prepare(`
-            SELECT
-                orders.order_id,
-                customers.customer_id,
-                customers.name AS customer,
-                customers.email,
-                orders.total_amount,
-                orders.status,
-                orders.created_at
-            FROM orders
-            JOIN customers
-                ON orders.customer_id =
-                   customers.customer_id
-            WHERE orders.order_id = ?
-        `)
-        .get(req.params.id);
+    const orderResult = await db.query(`
+    SELECT
+        orders.order_id,
+        customers.customer_id,
+        customers.name AS customer,
+        customers.email,
+        orders.total_amount,
+        orders.status,
+        orders.created_at
+    FROM orders
+    JOIN customers
+        ON orders.customer_id = customers.customer_id
+    WHERE orders.order_id = $1
+`, [req.params.id]);
+
+const order = orderResult.rows[0];
 
 
     if (!order) {
@@ -457,34 +451,32 @@ app.get("/api/orders/:id", (req, res) => {
     }
 
 
-    const items = db
-        .prepare(`
-            SELECT
-                products.product_id,
-                products.name AS product,
-                order_items.quantity,
-                order_items.price,
-                order_items.quantity *
-                order_items.price AS item_total
-            FROM order_items
-            JOIN products
-                ON order_items.product_id =
-                   products.product_id
-            WHERE order_items.order_id = ?
-        `)
-        .all(req.params.id);
+    const itemsResult = await db.query(`
+    SELECT
+        products.product_id,
+        products.name AS product,
+        order_items.quantity,
+        order_items.price,
+        order_items.quantity * order_items.price AS item_total
+    FROM order_items
+    JOIN products
+        ON order_items.product_id = products.product_id
+    WHERE order_items.order_id = $1
+`, [req.params.id]);
+
+    const items = itemsResult.rows;
 
 
-    const payment = db
-        .prepare(`
-            SELECT
-                payment_method,
-                payment_status,
-                amount
-            FROM payments
-            WHERE order_id = ?
-        `)
-        .get(req.params.id);
+    const paymentResult = await db.query(`
+    SELECT
+        payment_method,
+        payment_status,
+        amount
+    FROM payments
+    WHERE order_id = $1
+`, [req.params.id]);
+
+    const payment = paymentResult.rows[0];
 
 
     res.json({
@@ -520,10 +512,8 @@ app.get("/api/orders/:id", (req, res) => {
 // START SERVER
 // =====================================================
 
-app.listen(3001, () => {
+const PORT = process.env.PORT || 3001;
 
-    console.log(
-        "API server running on http://localhost:3001"
-    );
-
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`API server running on port ${PORT}`);
 });
