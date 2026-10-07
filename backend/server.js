@@ -1,7 +1,11 @@
 require("dotenv").config();
 const express = require("express");
 //const Database = require("better-sqlite3");
-const { Pool } = require("pg");
+//const { Pool } = require("pg");
+
+const { Pool, neonConfig } = require("@neondatabase/serverless");
+
+neonConfig.poolQueryViaFetch = true;
 
 const app = express();
 
@@ -38,7 +42,7 @@ const db = new Pool({
 // GET PRODUCTS
 // =====================================================
 
-app.get("/api/products", async (req, res) => {
+app.get("/api/products", async(req, res) => {
     const result = await db.query("SELECT * FROM products");
     const products = result.rows;
 
@@ -50,9 +54,9 @@ app.get("/api/products", async (req, res) => {
 // GET PRODUCT BY ID
 // =====================================================
 
-app.get("/api/products/:id", async (req, res) => {
+app.get("/api/products/:id", async(req, res) => {
 
-     const result = await db.query(`
+    const result = await db.query(`
         SELECT *
         FROM products
         WHERE product_id = $1
@@ -74,7 +78,7 @@ app.get("/api/products/:id", async (req, res) => {
 // CREATE ORDER
 // =====================================================
 
-app.post("/api/orders", async (req, res) => {
+app.post("/api/orders", async(req, res) => {
 
     console.log("POST /api/orders");
     console.log("Request body:", req.body);
@@ -150,13 +154,13 @@ app.post("/api/orders", async (req, res) => {
     // FIND OR CREATE CUSTOMER
     // =================================================
 
-   let customerResult = await db.query(`
+    let customerResult = await db.query(`
     SELECT *
     FROM customers
     WHERE email = $1
 `, [customer_email]);
 
-let customer = customerResult.rows[0];
+    let customer = customerResult.rows[0];
 
 
     if (!customer) {
@@ -167,7 +171,7 @@ let customer = customerResult.rows[0];
             RETURNING *
             `, [customer_name, customer_email]);
 
-            customer = customerResult.rows[0];
+        customer = customerResult.rows[0];
 
     }
 
@@ -181,7 +185,7 @@ let customer = customerResult.rows[0];
 
     for (const item of items) {
 
-     const productResult = await db.query(`
+        const productResult = await db.query(`
         SELECT *
         FROM products
         WHERE product_id = $1
@@ -255,18 +259,18 @@ let customer = customerResult.rows[0];
     // =================================================
     // DATABASE TRANSACTION
     // =================================================
-const createOrder = async () => {
+    const createOrder = async() => {
 
-    const client = await db.connect();
+        const client = await db.connect();
 
-    try {
-        await client.query("BEGIN");
+        try {
+            await client.query("BEGIN");
 
-        // ---------------------------------------------
-        // CREATE ORDER
-        // ---------------------------------------------
+            // ---------------------------------------------
+            // CREATE ORDER
+            // ---------------------------------------------
 
-        const orderResult = await client.query(`
+            const orderResult = await client.query(`
             INSERT INTO orders
             (
                 customer_id,
@@ -276,21 +280,21 @@ const createOrder = async () => {
             VALUES ($1, $2, $3)
             RETURNING order_id
         `, [
-            customer.customer_id,
-            total,
-            "PENDING"
-        ]);
+                customer.customer_id,
+                total,
+                "PENDING"
+            ]);
 
-        const orderId = orderResult.rows[0].order_id;
+            const orderId = orderResult.rows[0].order_id;
 
 
-        // ---------------------------------------------
-        // CREATE ORDER ITEMS
-        // ---------------------------------------------
+            // ---------------------------------------------
+            // CREATE ORDER ITEMS
+            // ---------------------------------------------
 
-        for (const item of products) {
+            for (const item of products) {
 
-            await client.query(`
+                await client.query(`
                 INSERT INTO order_items
                 (
                     order_id,
@@ -300,34 +304,34 @@ const createOrder = async () => {
                 )
                 VALUES ($1, $2, $3, $4)
             `, [
-                orderId,
-                item.product.product_id,
-                item.quantity,
-                item.product.price
-            ]);
+                    orderId,
+                    item.product.product_id,
+                    item.quantity,
+                    item.product.price
+                ]);
 
 
-            // ---------------------------------------------
-            // UPDATE STOCK
-            // ---------------------------------------------
+                // ---------------------------------------------
+                // UPDATE STOCK
+                // ---------------------------------------------
 
-            await client.query(`
+                await client.query(`
                 UPDATE products
                 SET stock = stock - $1
                 WHERE product_id = $2
             `, [
-                item.quantity,
-                item.product.product_id
-            ]);
+                    item.quantity,
+                    item.product.product_id
+                ]);
 
-        }
+            }
 
 
-        // ---------------------------------------------
-        // CREATE PAYMENT
-        // ---------------------------------------------
+            // ---------------------------------------------
+            // CREATE PAYMENT
+            // ---------------------------------------------
 
-        await client.query(`
+            await client.query(`
             INSERT INTO payments
             (
                 order_id,
@@ -337,30 +341,30 @@ const createOrder = async () => {
             )
             VALUES ($1, $2, $3, $4)
         `, [
-            orderId,
-            payment_method,
-            "PAID",
-            total
-        ]);
+                orderId,
+                payment_method,
+                "PAID",
+                total
+            ]);
 
-        await client.query("COMMIT");
+            await client.query("COMMIT");
 
-        return orderId;
+            return orderId;
 
-    } catch (error) {
+        } catch (error) {
 
-        await client.query("ROLLBACK");
-        throw error;
+            await client.query("ROLLBACK");
+            throw error;
 
-    } finally {
+        } finally {
 
-        client.release();
+            client.release();
 
-    }
-};
+        }
+    };
 
 
-const orderId = await createOrder();
+    const orderId = await createOrder();
 
     // =================================================
     // RESPONSE ITEMS
@@ -422,7 +426,7 @@ const orderId = await createOrder();
 // GET ORDER DETAIL
 // =====================================================
 
-app.get("/api/orders/:id", async (req, res) => {
+app.get("/api/orders/:id", async(req, res) => {
 
     const orderResult = await db.query(`
     SELECT
@@ -439,7 +443,7 @@ app.get("/api/orders/:id", async (req, res) => {
     WHERE orders.order_id = $1
 `, [req.params.id]);
 
-const order = orderResult.rows[0];
+    const order = orderResult.rows[0];
 
 
     if (!order) {
@@ -515,5 +519,5 @@ const order = orderResult.rows[0];
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`API server running on port ${PORT}`);
+    console.log(`API server running on port ${PORT}`);
 });
