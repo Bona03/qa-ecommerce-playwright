@@ -2,7 +2,7 @@ const productList = document.getElementById("product-list");
 const cartItem = document.getElementById("cart-item");
 const checkoutButton = document.getElementById("checkout-button");
 
-const API_URL = "https://molasses-thin-bat.abasthan.app"
+const API_URL = "https://qa-ecommerce-playwright.vercel.app"
 
 let products = [];
 let cart = [];
