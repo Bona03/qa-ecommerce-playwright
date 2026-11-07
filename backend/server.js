@@ -54,13 +54,30 @@ app.get("/api/products", async(req, res) => {
 // GET PRODUCT BY ID
 // =====================================================
 
+
 app.get("/api/products/:id", async(req, res) => {
+    const productId = req.params.id;
+
+    // Validate product ID format
+    if (!/^[1-9]\d*$/.test(productId)) {
+        return res.status(400).json({
+            message: "Invalid product ID"
+        });
+    }
+
+    const numericProductId = Number(productId);
+
+    if (!Number.isSafeInteger(numericProductId)) {
+        return res.status(400).json({
+            message: "Invalid product ID"
+        });
+    }
 
     const result = await db.query(`
-        SELECT *
-        FROM products
-        WHERE product_id = $1
-    `, [req.params.id]);
+    SELECT *
+    FROM products
+    WHERE product_id = $1
+  `, [numericProductId]);
 
     const product = result.rows[0];
 
@@ -72,6 +89,7 @@ app.get("/api/products/:id", async(req, res) => {
 
     res.json(product);
 });
+
 
 
 // =====================================================
