@@ -5,6 +5,13 @@ const express = require("express");
 
 const { Pool, neonConfig } = require("@neondatabase/serverless");
 
+const nodeMajorVersion = Number(process.versions.node.split(".")[0]);
+
+if (nodeMajorVersion <= 21) {
+    const ws = require("ws");
+    neonConfig.webSocketConstructor = ws;
+}
+
 neonConfig.poolQueryViaFetch = true;
 
 const app = express();
@@ -201,26 +208,106 @@ app.post("/api/orders", async(req, res) => {
     const products = [];
 
 
+    // for (const item of items) {
+
+
+    //     const productResult = await db.query(`
+    //     SELECT *
+    //     FROM products
+    //     WHERE product_id = $1
+    //     `, [item.product_id]);
+
+    //     const product = productResult.rows[0];
+
+    //     if (!item || item.product_id === undefined ||
+    //         item.product_id === null || item.product_id === '') {
+    //         return res.status(400).json({
+    //             message: "Product ID is required"
+    //         });
+    //     }
+
+    //     if (!Number.isInteger(item.product_id) || item.product_id <= 0) {
+    //         return res.status(400).json({
+    //             message: "Invalid product ID"
+    //         });
+    //     }
+
+    //     if (!product) {
+
+    //         return res.status(404).json({
+    //             message: `Product ${item.product_id} not found`
+    //         });
+
+    //     }
+
+
+    //     if (!Number.isInteger(item.quantity) ||
+    //         item.quantity <= 0
+    //     ) {
+
+    //         return res.status(400).json({
+    //             message: "Quantity must be greater than 0"
+    //         });
+
+    //     }
+
+
+    //     if (
+    //         product.stock <
+    //         item.quantity
+    //     ) {
+
+    //         return res.status(400).json({
+    //             message: `Insufficient stock for ${product.name}`
+    //         });
+
+    //     }
+
+
+    //     products.push({
+    //         product: product,
+    //         quantity: item.quantity
+    //     });
+
+    // }
+
+
     for (const item of items) {
 
+        // VALIDATE PRODUCT ID
+        if (!item || item.product_id === undefined ||
+            item.product_id === null || item.product_id === '') {
+
+            return res.status(400).json({
+                message: "Product ID is required"
+            });
+        }
+
+        if (!Number.isInteger(item.product_id) || item.product_id <= 0) {
+
+            return res.status(400).json({
+                message: "Invalid product ID"
+            });
+        }
+
+        // FIND PRODUCT
         const productResult = await db.query(`
         SELECT *
         FROM products
         WHERE product_id = $1
-        `, [item.product_id]);
+    `, [item.product_id]);
 
         const product = productResult.rows[0];
 
-
+        // VALIDATE PRODUCT EXISTENCE
         if (!product) {
 
             return res.status(404).json({
                 message: `Product ${item.product_id} not found`
             });
-
         }
 
-
+        // VALIDATE QUANTITY
         if (!Number.isInteger(item.quantity) ||
             item.quantity <= 0
         ) {
@@ -228,28 +315,24 @@ app.post("/api/orders", async(req, res) => {
             return res.status(400).json({
                 message: "Quantity must be greater than 0"
             });
-
         }
 
-
-        if (
-            product.stock <
-            item.quantity
-        ) {
+        // VALIDATE STOCK
+        if (product.stock < item.quantity) {
 
             return res.status(400).json({
                 message: `Insufficient stock for ${product.name}`
             });
-
         }
 
-
+        // ADD PRODUCT TO ARRAY
         products.push({
             product: product,
             quantity: item.quantity
         });
 
     }
+
 
 
     // =================================================
@@ -370,6 +453,8 @@ app.post("/api/orders", async(req, res) => {
             return orderId;
 
         } catch (error) {
+
+            console.error("ORDER TRANSACTION ERROR:", error);
 
             await client.query("ROLLBACK");
             throw error;
