@@ -19,20 +19,52 @@ const app = express();
 app.use(express.json());
 
 // Allow frontend to access backend API
-app.use((req, res, next) => {
-    res.header(
-        "Access-Control-Allow-Origin",
-        "http://localhost:3000"
-    );
+// app.use((req, res, next) => {
+//     res.header(
+//         "Access-Control-Allow-Origin",
+//         "http://localhost:3000"
+//     );
 
+//     res.header(
+//         "Access-Control-Allow-Headers",
+//         "Origin, X-Requested-With, Content-Type, Accept"
+//     );
+
+//     next();
+// });
+
+// Allow frontend to access backend API
+const allowedOrigins = [
+    "http://localhost:3000",
+    "https://qa-ecommerce-playwright.vercel.app"
+];
+
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+
+    const isVercelPreview =
+        /^https:\/\/qa-ecommerce-playwright-[a-z0-9-]+-bona-qa\.vercel\.app$/.test(origin || "");
+
+    if (allowedOrigins.includes(origin) || isVercelPreview) {
+        res.header("Access-Control-Allow-Origin", origin);
+    }
+
+    res.header("Vary", "Origin");
     res.header(
         "Access-Control-Allow-Headers",
         "Origin, X-Requested-With, Content-Type, Accept"
     );
+    res.header(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    );
+
+    if (req.method === "OPTIONS") {
+        return res.sendStatus(204);
+    }
 
     next();
 });
-
 /*const db = new Database("database/ecommerce.db");
 db.pragma("foreign_keys = ON");
 */

@@ -1,4 +1,5 @@
-const API_URL = "https://qa-ecommerce-playwright.vercel.app";
+//const API_URL = "https://qa-ecommerce-playwright.vercel.app";
+const API_URL = window.location.origin;
 
 let cart = [];
 
