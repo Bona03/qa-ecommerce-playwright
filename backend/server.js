@@ -164,6 +164,10 @@ app.post("/api/orders", async(req, res) => {
             message: "Required order data is missing"
         });
 
+        //console.log('Missing Product ID Response:', await response.text());
+
+        expect(response.status()).toBe(400);
+
     }
 
 
@@ -210,27 +214,6 @@ app.post("/api/orders", async(req, res) => {
     // =================================================
     // FIND OR CREATE CUSTOMER
     // =================================================
-
-    let customerResult = await db.query(`
-    SELECT *
-    FROM customers
-    WHERE email = $1
-`, [customer_email]);
-
-    let customer = customerResult.rows[0];
-
-
-    if (!customer) {
-        const customerResult = await db.query(`
-            INSERT INTO customers
-            (name, email)
-            VALUES ($1, $2)
-            RETURNING *
-            `, [customer_name, customer_email]);
-
-        customer = customerResult.rows[0];
-
-    }
 
 
     // =================================================
@@ -392,12 +375,34 @@ app.post("/api/orders", async(req, res) => {
     // =================================================
     // DATABASE TRANSACTION
     // =================================================
+
+    let customer;
+
     const createOrder = async() => {
 
         const client = await db.connect();
 
         try {
             await client.query("BEGIN");
+            // FIND OR CREATE CUSTOMER
+            let customerResult = await client.query(`
+                SELECT *
+                FROM customers
+                WHERE email = $1
+                `, [customer_email]);
+
+            customer = customerResult.rows[0];
+
+            if (!customer) {
+                const insertCustomerResult = await client.query(`
+                INSERT INTO customers
+                (name, email)
+                VALUES ($1, $2)
+                RETURNING *
+                `, [customer_name, customer_email]);
+
+                customer = insertCustomerResult.rows[0];
+            }
 
             // ---------------------------------------------
             // CREATE ORDER
