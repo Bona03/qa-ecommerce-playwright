@@ -2,7 +2,8 @@ const productList = document.getElementById("product-list");
 const cartItem = document.getElementById("cart-item");
 const checkoutButton = document.getElementById("checkout-button");
 
-const API_URL = "https://qa-ecommerce-playwright.vercel.app"
+//const API_URL = "https://qa-ecommerce-playwright.vercel.app"
+const API_URL = window.location.origin;
 
 let products = [];
 let cart = [];

@@ -5,6 +5,13 @@ const express = require("express");
 
 const { Pool, neonConfig } = require("@neondatabase/serverless");
 
+const nodeMajorVersion = Number(process.versions.node.split(".")[0]);
+
+if (nodeMajorVersion <= 21) {
+    const ws = require("ws");
+    neonConfig.webSocketConstructor = ws;
+}
+
 neonConfig.poolQueryViaFetch = true;
 
 const app = express();
@@ -12,20 +19,52 @@ const app = express();
 app.use(express.json());
 
 // Allow frontend to access backend API
-app.use((req, res, next) => {
-    res.header(
-        "Access-Control-Allow-Origin",
-        "http://localhost:3000"
-    );
+// app.use((req, res, next) => {
+//     res.header(
+//         "Access-Control-Allow-Origin",
+//         "http://localhost:3000"
+//     );
 
+//     res.header(
+//         "Access-Control-Allow-Headers",
+//         "Origin, X-Requested-With, Content-Type, Accept"
+//     );
+
+//     next();
+// });
+
+// Allow frontend to access backend API
+const allowedOrigins = [
+    "http://localhost:3000",
+    "https://qa-ecommerce-playwright.vercel.app"
+];
+
+app.use((req, res, next) => {
+    const origin = req.headers.origin;
+
+    const isVercelPreview =
+        /^https:\/\/qa-ecommerce-playwright-[a-z0-9-]+-bona-qa\.vercel\.app$/.test(origin || "");
+
+    if (allowedOrigins.includes(origin) || isVercelPreview) {
+        res.header("Access-Control-Allow-Origin", origin);
+    }
+
+    res.header("Vary", "Origin");
     res.header(
         "Access-Control-Allow-Headers",
         "Origin, X-Requested-With, Content-Type, Accept"
     );
+    res.header(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    );
+
+    if (req.method === "OPTIONS") {
+        return res.sendStatus(204);
+    }
 
     next();
 });
-
 /*const db = new Database("database/ecommerce.db");
 db.pragma("foreign_keys = ON");
 */
@@ -125,6 +164,8 @@ app.post("/api/orders", async(req, res) => {
             message: "Required order data is missing"
         });
 
+
+
     }
 
 
@@ -172,84 +213,85 @@ app.post("/api/orders", async(req, res) => {
     // FIND OR CREATE CUSTOMER
     // =================================================
 
-    let customerResult = await db.query(`
-    SELECT *
-    FROM customers
-    WHERE email = $1
-`, [customer_email]);
-
-    let customer = customerResult.rows[0];
-
-
-    if (!customer) {
-        const customerResult = await db.query(`
-            INSERT INTO customers
-            (name, email)
-            VALUES ($1, $2)
-            RETURNING *
-            `, [customer_name, customer_email]);
-
-        customer = customerResult.rows[0];
-
-    }
-
 
     // =================================================
     // CHECK ALL PRODUCTS
     // =================================================
 
+
     const products = [];
 
+    // GROUP ITEMS BY PRODUCT ID
+    const productQuantities = new Map();
 
     for (const item of items) {
 
-        const productResult = await db.query(`
-        SELECT *
-        FROM products
-        WHERE product_id = $1
-        `, [item.product_id]);
+        // VALIDATE PRODUCT ID
+        if (!item || item.product_id === undefined ||
+            item.product_id === null || item.product_id === '') {
 
-        const product = productResult.rows[0];
-
-
-        if (!product) {
-
-            return res.status(404).json({
-                message: `Product ${item.product_id} not found`
+            return res.status(400).json({
+                message: "Product ID is required"
             });
-
         }
 
+        if (!Number.isInteger(item.product_id) || item.product_id <= 0) {
 
-        if (!Number.isInteger(item.quantity) ||
-            item.quantity <= 0
-        ) {
+            return res.status(400).json({
+                message: "Invalid product ID"
+            });
+        }
+
+        // VALIDATE QUANTITY
+        if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
 
             return res.status(400).json({
                 message: "Quantity must be greater than 0"
             });
-
         }
 
+        // SUM QUANTITY FOR DUPLICATE PRODUCT IDs
+        const currentQuantity = productQuantities.get(item.product_id) || 0;
 
-        if (
-            product.stock <
-            item.quantity
-        ) {
+        productQuantities.set(
+            item.product_id,
+            currentQuantity + item.quantity
+        );
+    }
 
+    // CHECK EACH UNIQUE PRODUCT
+    for (const [productId, totalQuantity] of productQuantities) {
+
+        const productResult = await db.query(`
+            SELECT *
+            FROM products
+            WHERE product_id = $1
+        `, [productId]);
+
+        const product = productResult.rows[0];
+
+        // VALIDATE PRODUCT EXISTENCE
+        if (!product) {
+            return res.status(404).json({
+                message: `Product ${productId} not found`
+            });
+        }
+
+        // VALIDATE TOTAL STOCK
+        if (product.stock < totalQuantity) {
             return res.status(400).json({
                 message: `Insufficient stock for ${product.name}`
             });
-
         }
 
-
+        // ADD PRODUCT WITH COMBINED QUANTITY
         products.push({
             product: product,
-            quantity: item.quantity
+            quantity: totalQuantity
         });
-
     }
+
+
 
 
     // =================================================
@@ -277,12 +319,34 @@ app.post("/api/orders", async(req, res) => {
     // =================================================
     // DATABASE TRANSACTION
     // =================================================
+
+    let customer;
+
     const createOrder = async() => {
 
         const client = await db.connect();
 
         try {
             await client.query("BEGIN");
+            // FIND OR CREATE CUSTOMER
+            let customerResult = await client.query(`
+                SELECT *
+                FROM customers
+                WHERE email = $1
+                `, [customer_email]);
+
+            customer = customerResult.rows[0];
+
+            if (!customer) {
+                const insertCustomerResult = await client.query(`
+                INSERT INTO customers
+                (name, email)
+                VALUES ($1, $2)
+                RETURNING *
+                `, [customer_name, customer_email]);
+
+                customer = insertCustomerResult.rows[0];
+            }
 
             // ---------------------------------------------
             // CREATE ORDER
@@ -332,16 +396,24 @@ app.post("/api/orders", async(req, res) => {
                 // ---------------------------------------------
                 // UPDATE STOCK
                 // ---------------------------------------------
-
-                await client.query(`
-                UPDATE products
-                SET stock = stock - $1
-                WHERE product_id = $2
-            `, [
+                const stockUpdate = await client.query(`
+                    UPDATE products
+                    SET stock = stock - $1
+                    WHERE product_id = $2
+                    AND stock >= $1
+                `, [
                     item.quantity,
                     item.product.product_id
                 ]);
 
+                if (stockUpdate.rowCount === 0) {
+                    const error = new Error(
+                        `Insufficient stock for ${item.product.name}`
+                    );
+
+                    error.code = 'INSUFFICIENT_STOCK';
+                    throw error;
+                }
             }
 
 
@@ -371,6 +443,8 @@ app.post("/api/orders", async(req, res) => {
 
         } catch (error) {
 
+            console.error("ORDER TRANSACTION ERROR:", error);
+
             await client.query("ROLLBACK");
             throw error;
 
@@ -382,7 +456,23 @@ app.post("/api/orders", async(req, res) => {
     };
 
 
-    const orderId = await createOrder();
+    let orderId;
+
+    try {
+        orderId = await createOrder();
+
+    } catch (error) {
+        if (error.code === 'INSUFFICIENT_STOCK') {
+            return res.status(400).json({
+                message: error.message
+            });
+        }
+        console.error("CREATE ORDER ERROR:", error);
+
+        return res.status(500).json({
+            message: "Failed to create order"
+        });
+    }
 
     // =================================================
     // RESPONSE ITEMS
