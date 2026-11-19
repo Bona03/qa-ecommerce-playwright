@@ -164,9 +164,7 @@ app.post("/api/orders", async(req, res) => {
             message: "Required order data is missing"
         });
 
-        //console.log('Missing Product ID Response:', await response.text());
 
-        expect(response.status()).toBe(400);
 
     }
 
@@ -220,72 +218,11 @@ app.post("/api/orders", async(req, res) => {
     // CHECK ALL PRODUCTS
     // =================================================
 
+
     const products = [];
 
-
-    // for (const item of items) {
-
-
-    //     const productResult = await db.query(`
-    //     SELECT *
-    //     FROM products
-    //     WHERE product_id = $1
-    //     `, [item.product_id]);
-
-    //     const product = productResult.rows[0];
-
-    //     if (!item || item.product_id === undefined ||
-    //         item.product_id === null || item.product_id === '') {
-    //         return res.status(400).json({
-    //             message: "Product ID is required"
-    //         });
-    //     }
-
-    //     if (!Number.isInteger(item.product_id) || item.product_id <= 0) {
-    //         return res.status(400).json({
-    //             message: "Invalid product ID"
-    //         });
-    //     }
-
-    //     if (!product) {
-
-    //         return res.status(404).json({
-    //             message: `Product ${item.product_id} not found`
-    //         });
-
-    //     }
-
-
-    //     if (!Number.isInteger(item.quantity) ||
-    //         item.quantity <= 0
-    //     ) {
-
-    //         return res.status(400).json({
-    //             message: "Quantity must be greater than 0"
-    //         });
-
-    //     }
-
-
-    //     if (
-    //         product.stock <
-    //         item.quantity
-    //     ) {
-
-    //         return res.status(400).json({
-    //             message: `Insufficient stock for ${product.name}`
-    //         });
-
-    //     }
-
-
-    //     products.push({
-    //         product: product,
-    //         quantity: item.quantity
-    //     });
-
-    // }
-
+    // GROUP ITEMS BY PRODUCT ID
+    const productQuantities = new Map();
 
     for (const item of items) {
 
@@ -305,48 +242,55 @@ app.post("/api/orders", async(req, res) => {
             });
         }
 
-        // FIND PRODUCT
-        const productResult = await db.query(`
-        SELECT *
-        FROM products
-        WHERE product_id = $1
-    `, [item.product_id]);
-
-        const product = productResult.rows[0];
-
-        // VALIDATE PRODUCT EXISTENCE
-        if (!product) {
-
-            return res.status(404).json({
-                message: `Product ${item.product_id} not found`
-            });
-        }
-
         // VALIDATE QUANTITY
-        if (!Number.isInteger(item.quantity) ||
-            item.quantity <= 0
-        ) {
+        if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
 
             return res.status(400).json({
                 message: "Quantity must be greater than 0"
             });
         }
 
-        // VALIDATE STOCK
-        if (product.stock < item.quantity) {
+        // SUM QUANTITY FOR DUPLICATE PRODUCT IDs
+        const currentQuantity = productQuantities.get(item.product_id) || 0;
 
+        productQuantities.set(
+            item.product_id,
+            currentQuantity + item.quantity
+        );
+    }
+
+    // CHECK EACH UNIQUE PRODUCT
+    for (const [productId, totalQuantity] of productQuantities) {
+
+        const productResult = await db.query(`
+            SELECT *
+            FROM products
+            WHERE product_id = $1
+        `, [productId]);
+
+        const product = productResult.rows[0];
+
+        // VALIDATE PRODUCT EXISTENCE
+        if (!product) {
+            return res.status(404).json({
+                message: `Product ${productId} not found`
+            });
+        }
+
+        // VALIDATE TOTAL STOCK
+        if (product.stock < totalQuantity) {
             return res.status(400).json({
                 message: `Insufficient stock for ${product.name}`
             });
         }
 
-        // ADD PRODUCT TO ARRAY
+        // ADD PRODUCT WITH COMBINED QUANTITY
         products.push({
             product: product,
-            quantity: item.quantity
+            quantity: totalQuantity
         });
-
     }
+
 
 
 
@@ -452,16 +396,24 @@ app.post("/api/orders", async(req, res) => {
                 // ---------------------------------------------
                 // UPDATE STOCK
                 // ---------------------------------------------
-
-                await client.query(`
-                UPDATE products
-                SET stock = stock - $1
-                WHERE product_id = $2
-            `, [
+                const stockUpdate = await client.query(`
+                    UPDATE products
+                    SET stock = stock - $1
+                    WHERE product_id = $2
+                    AND stock >= $1
+                `, [
                     item.quantity,
                     item.product.product_id
                 ]);
 
+                if (stockUpdate.rowCount === 0) {
+                    const error = new Error(
+                        `Insufficient stock for ${item.product.name}`
+                    );
+
+                    error.code = 'INSUFFICIENT_STOCK';
+                    throw error;
+                }
             }
 
 
@@ -504,7 +456,23 @@ app.post("/api/orders", async(req, res) => {
     };
 
 
-    const orderId = await createOrder();
+    let orderId;
+
+    try {
+        orderId = await createOrder();
+
+    } catch (error) {
+        if (error.code === 'INSUFFICIENT_STOCK') {
+            return res.status(400).json({
+                message: error.message
+            });
+        }
+        console.error("CREATE ORDER ERROR:", error);
+
+        return res.status(500).json({
+            message: "Failed to create order"
+        });
+    }
 
     // =================================================
     // RESPONSE ITEMS
